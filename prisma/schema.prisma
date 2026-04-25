@@ -1,0 +1,139 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Analysis {
+  id          String   @id @default(cuid())
+  stockCode   String
+  stockName   String?
+  market      String   @default("cn")
+  report      String   // Markdown report content
+  score       Int?     // 0-100 score
+  trend       String?  // bullish/bearish/neutral
+  advice      String?  // buy/sell/hold
+  summary     String?  // Brief summary
+  reportJson  String?  // Full structured report as JSON
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ChatSession {
+  id          String   @id @default(cuid())
+  title       String   @default("New Chat")
+  stockCode   String?
+  stockName   String?
+  messageCount Int     @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  messages    ChatMessage[]
+}
+
+model ChatMessage {
+  id          String   @id @default(cuid())
+  sessionId   String
+  role        String   // user / assistant
+  content     String
+  skillName   String?
+  thinkingSteps String? // JSON array of thinking steps
+  createdAt   DateTime @default(now())
+  session     ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+model PortfolioAccount {
+  id          String   @id @default(cuid())
+  name        String
+  broker      String?  @default("Demo")
+  market      String   @default("cn")
+  baseCurrency String  @default("CNY")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  trades      PortfolioTrade[]
+  cashLedgers PortfolioCashLedger[]
+  corporateActions PortfolioCorporateAction[]
+}
+
+model PortfolioTrade {
+  id          String   @id @default(cuid())
+  accountId   String
+  symbol      String
+  tradeDate   DateTime
+  side        String   // buy / sell
+  quantity    Float
+  price       Float
+  fee         Float    @default(0)
+  tax         Float    @default(0)
+  tradeUid    String?
+  note        String?
+  createdAt   DateTime @default(now())
+  account     PortfolioAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+}
+
+model PortfolioCashLedger {
+  id          String   @id @default(cuid())
+  accountId   String
+  eventDate   DateTime
+  direction   String   // in / out
+  amount      Float
+  currency    String?
+  note        String?
+  createdAt   DateTime @default(now())
+  account     PortfolioAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+}
+
+model PortfolioCorporateAction {
+  id                  String   @id @default(cuid())
+  accountId           String
+  symbol              String
+  effectiveDate       DateTime
+  actionType          String   // cash_dividend / stock_split
+  cashDividendPerShare Float?
+  splitRatio          Float?
+  note                String?
+  createdAt           DateTime @default(now())
+  account             PortfolioAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+}
+
+model BacktestResult {
+  id              String   @id @default(cuid())
+  analysisId      String?  @unique
+  stockCode       String
+  stockName       String?
+  analysisDate    DateTime?
+  trendPrediction String?
+  operationAdvice String?
+  directionExpected String?
+  actualReturnPct Float?
+  actualMovement  String?  // up / down / flat
+  directionCorrect Boolean?
+  outcome         String?  // win / loss / neutral
+  evalStatus      String   @default("pending") // completed / insufficient / error
+  evalWindowDays  Int      @default(10)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model SystemConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String?
+  category  String   @default("base")
+  updatedAt DateTime @updatedAt
+}
+
+model Task {
+  id          String   @id @default(cuid())
+  type        String   // analysis / backtest / market_review
+  status      String   @default("pending") // pending / running / completed / failed
+  stockCode   String?
+  stockName   String?
+  progress    Int      @default(0)
+  message     String?
+  result      String?  // JSON result
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
