@@ -13,12 +13,12 @@ model Analysis {
   stockCode   String
   stockName   String?
   market      String   @default("cn")
-  report      String   // Markdown report content
+  report      String   @db.Text // Markdown report content
   score       Int?     // 0-100 score
   trend       String?  // bullish/bearish/neutral
   advice      String?  // buy/sell/hold
-  summary     String?  // Brief summary
-  reportJson  String?  // Full structured report as JSON
+  summary     String?  @db.Text // Brief summary
+  reportJson  String?  @db.Text // Full structured report as JSON
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -38,9 +38,9 @@ model ChatMessage {
   id          String   @id @default(cuid())
   sessionId   String
   role        String   // user / assistant
-  content     String
+  content     String   @db.Text
   skillName   String?
-  thinkingSteps String? // JSON array of thinking steps
+  thinkingSteps String?  @db.Text // JSON array of thinking steps
   createdAt   DateTime @default(now())
   session     ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 }
@@ -134,7 +134,7 @@ model Task {
   stockName   String?
   progress    Int      @default(0)
   message     String?
-  result      String?  // JSON result
+  result      String?  @db.Text // JSON result
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }

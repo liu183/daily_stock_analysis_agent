@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { buildStockContext } from '@/lib/stock-data-context';
-import ZAI from 'z-ai-web-dev-sdk';
+import { chat } from '@/lib/nvidia-llm';
 
 const STRATEGY_PROMPTS: Record<string, string> = {
   '均线金叉': '请重点分析均线系统，包括MA5、MA10、MA20、MA60的金叉死叉关系，判断短期和中期趋势。结合均线多头排列/空头排列给出买卖建议。',
@@ -100,22 +100,19 @@ export async function POST(request: NextRequest) {
       lastMsg.content = lastMsg.content + stockContext;
     }
 
-    // Step 6: Call LLM
+    // Step 6: Call NVIDIA LLM
     const systemPrompt = buildSystemPrompt(skill);
-    const zai = await ZAI.create();
 
     const startTime = Date.now();
 
-    const completion = await zai.chat.completions.create({
-      messages: [
+    const aiContent = await chat(
+      [
         { role: 'system', content: systemPrompt },
-        ...conversationMessages,
+        ...conversationMessages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
       ],
-      thinking: { type: 'disabled' },
-    });
+    );
 
     const duration = Date.now() - startTime;
-    const aiContent = completion.choices[0]?.message?.content;
 
     if (!aiContent) {
       throw new Error('AI returned empty response');

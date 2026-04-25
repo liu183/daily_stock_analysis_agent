@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import ZAI from 'z-ai-web-dev-sdk';
+import { chat } from '@/lib/nvidia-llm';
 import type { AnalysisReport, ReportJson } from '@/types/stock';
 
 const FINANCE_BASE = 'https://internal-api.z.ai/external/finance';
@@ -171,19 +171,8 @@ export async function POST(request: NextRequest) {
       financialData
     );
 
-    // Step 3: Use LLM to generate analysis
-    const zai = await ZAI.create();
-    const completion = await zai.chat.completions.create({
-      messages: [
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
-      thinking: { type: 'disabled' },
-    });
-
-    const rawContent = completion.choices[0]?.message?.content;
+    // Step 3: Use NVIDIA LLM to generate analysis
+    const rawContent = await chat([{ role: 'user', content: prompt }]);
     if (!rawContent) {
       throw new Error('LLM returned empty response');
     }
