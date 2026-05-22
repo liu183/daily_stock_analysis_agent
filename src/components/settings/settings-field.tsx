@@ -43,6 +43,39 @@ export function SettingsField({
         );
 
       case 'select':
+        // Rich model selector for AI model config
+        if (config.key === 'LITELLM_MODEL') {
+          const modelOptions = [
+            { value: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash', desc: '256K上下文 · 思考模式 · 工具调用' },
+            { value: 'sensenova-6.7-flash-lite', label: 'SenseNova 6.7 Flash-Lite', desc: '多模态 · 轻量快速' },
+            { value: 'sensenova-u1-fast', label: 'SenseNova U1 Fast', desc: '信息图生成专用' },
+          ];
+          const selected = modelOptions.find(o => o.value === value);
+          return (
+            <Select value={value || 'deepseek-v4-flash'} onValueChange={(val) => onChange(config.key, val)}>
+              <SelectTrigger className="w-72 h-9 text-sm">
+                <SelectValue>
+                  {selected ? (
+                    <span className="flex items-center gap-2">
+                      <span>{selected.label}</span>
+                      <span className="text-xs text-muted-foreground">{selected.desc}</span>
+                    </span>
+                  ) : null}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {modelOptions.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    <div className="flex flex-col">
+                      <span>{opt.label}</span>
+                      <span className="text-xs text-muted-foreground">{opt.desc}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          );
+        }
         return (
           <Select
             value={value || config.type}

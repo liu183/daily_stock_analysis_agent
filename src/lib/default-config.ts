@@ -32,9 +32,10 @@ export const DEFAULT_CONFIG: Record<string, ConfigDef> = {
   LITELLM_MODEL: {
     key: 'LITELLM_MODEL',
     label: 'AI 模型',
-    description: 'LiteLLM 模型标识',
-    type: 'text',
-    default: 'gemini/gemini-2.5-flash',
+    description: '选择 AI 对话模型',
+    type: 'select',
+    options: ['deepseek-v4-flash', 'sensenova-6.7-flash-lite', 'sensenova-u1-fast'],
+    default: 'deepseek-v4-flash',
     category: 'ai_model',
   },
   LLM_TEMPERATURE: {

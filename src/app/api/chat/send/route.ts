@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { buildStockContext } from '@/lib/stock-data-context';
-import { chat } from '@/lib/nvidia-llm';
+import { chat } from '@/lib/llm';
+import { getConfigValue } from '@/lib/config-helpers';
 
 const STRATEGY_PROMPTS: Record<string, string> = {
   '均线金叉': '请重点分析均线系统，包括MA5、MA10、MA20、MA60的金叉死叉关系，判断短期和中期趋势。结合均线多头排列/空头排列给出买卖建议。',
@@ -100,8 +101,10 @@ export async function POST(request: NextRequest) {
       lastMsg.content = lastMsg.content + stockContext;
     }
 
-    // Step 6: Call NVIDIA LLM
+    // Step 6: Call LLM
     const systemPrompt = buildSystemPrompt(skill);
+    const selectedModel = await getConfigValue('LITELLM_MODEL', 'deepseek-v4-flash');
+    const temperature = parseFloat(await getConfigValue('LLM_TEMPERATURE', '0.7')) || 0.7;
 
     const startTime = Date.now();
 
@@ -110,6 +113,7 @@ export async function POST(request: NextRequest) {
         { role: 'system', content: systemPrompt },
         ...conversationMessages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
       ],
+      { model: selectedModel, temperature },
     );
 
     const duration = Date.now() - startTime;

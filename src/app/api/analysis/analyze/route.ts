@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { chat } from '@/lib/nvidia-llm';
+import { chat } from '@/lib/llm';
+import { getConfigValue } from '@/lib/config-helpers';
 import type { AnalysisReport, ReportJson } from '@/types/stock';
 
 const FINANCE_BASE = 'https://internal-api.z.ai/external/finance';
@@ -171,8 +172,10 @@ export async function POST(request: NextRequest) {
       financialData
     );
 
-    // Step 3: Use NVIDIA LLM to generate analysis
-    const rawContent = await chat([{ role: 'user', content: prompt }]);
+    // Step 3: Use LLM to generate analysis
+    const selectedModel = await getConfigValue('LITELLM_MODEL', 'deepseek-v4-flash');
+    const temperature = parseFloat(await getConfigValue('LLM_TEMPERATURE', '0.7')) || 0.7;
+    const rawContent = await chat([{ role: 'user', content: prompt }], { model: selectedModel, temperature });
     if (!rawContent) {
       throw new Error('LLM returned empty response');
     }
