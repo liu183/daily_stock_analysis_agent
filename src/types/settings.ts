@@ -6,8 +6,9 @@ export interface SystemConfigItem {
   updatedAt: string;
   label: string;
   description: string;
-  type: 'text' | 'number' | 'select' | 'toggle' | 'password';
+  type: 'text' | 'number' | 'select' | 'toggle' | 'password' | 'provider' | 'model_select';
   options?: string[];
+  meta?: Record<string, unknown>;
   issues?: string[];
 }
 

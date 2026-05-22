@@ -1,17 +1,16 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { Save, RotateCcw, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Save, RotateCcw, Loader2, CheckCircle2, AlertCircle, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import { SettingsField } from './settings-field';
 import { SettingsCategoryNav } from './settings-category-nav';
 import type { SystemConfigItem, ConfigCategory } from '@/types/settings';
 import { DEFAULT_CONFIG } from '@/lib/default-config';
 
 export function SettingsView() {
-  const [activeCategory, setActiveCategory] = useState<ConfigCategory>('base');
+  const [activeCategory, setActiveCategory] = useState<ConfigCategory>('ai_model');
   const [settings, setSettings] = useState<SystemConfigItem[]>([]);
   const [editedValues, setEditedValues] = useState<Record<string, string>>({});
   const [validationIssues, setValidationIssues] = useState<Record<string, string[]>>({});
@@ -25,7 +24,6 @@ export function SettingsView() {
       const res = await fetch('/api/settings');
       if (res.ok) {
         const grouped = await res.json();
-        // Flatten grouped object into array
         const all: SystemConfigItem[] = [];
         for (const category of Object.keys(grouped)) {
           const items = grouped[category];
@@ -47,7 +45,20 @@ export function SettingsView() {
   }, [fetchSettings]);
 
   const handleChange = useCallback((key: string, value: string) => {
-    setEditedValues((prev) => ({ ...prev, [key]: value }));
+    setEditedValues((prev) => {
+      const next = { ...prev, [key]: value };
+
+      // When provider changes, auto-select the first model of the new provider
+      if (key === 'LLM_PROVIDER') {
+        const { LLM_PROVIDERS } = require('@/lib/llm');
+        const provider = LLM_PROVIDERS.find((p: { id: string }) => p.id === value);
+        if (provider && provider.models.length > 0) {
+          next['LITELLM_MODEL'] = provider.models[0].id;
+        }
+      }
+
+      return next;
+    });
     // Clear issues for this key when value changes
     setValidationIssues((prev) => {
       const next = { ...prev };
@@ -61,7 +72,6 @@ export function SettingsView() {
     setSaving(true);
     setSaveSuccess(false);
     try {
-      // Validate all edited values
       const editedKeys = Object.keys(editedValues);
       const newIssues: Record<string, string[]> = {};
 
@@ -86,14 +96,12 @@ export function SettingsView() {
 
       setValidationIssues(newIssues);
 
-      // If there are issues, don't save
       const hasErrors = Object.values(newIssues).some((i) => i.length > 0);
       if (hasErrors) {
         setSaving(false);
         return;
       }
 
-      // Build settings array to save
       const toSave = editedKeys.map((key) => ({
         key,
         value: editedValues[key],
@@ -124,7 +132,7 @@ export function SettingsView() {
     setSaveSuccess(false);
   }, []);
 
-  // Get current value for a config item
+  // Get current value for a config item (edited value > db value > default)
   const getValue = (config: SystemConfigItem): string => {
     if (config.key in editedValues) {
       return editedValues[config.key];
@@ -132,12 +140,19 @@ export function SettingsView() {
     return config.value || DEFAULT_CONFIG[config.key]?.default || '';
   };
 
-  // Filter settings for the active category
+  // Get all current values (for provider-dependent fields)
+  const getAllValues = useCallback((): Record<string, string> => {
+    const all: Record<string, string> = {};
+    for (const s of settings) {
+      all[s.key] = getValue(s);
+    }
+    return all;
+  }, [settings, editedValues]);
+
   const categorySettings = settings.filter(
     (s) => s.category === activeCategory
   );
 
-  // Compute issue counts per category
   const issueCounts: Record<string, number> = {};
   for (const key of Object.keys(validationIssues)) {
     const issues = validationIssues[key];
@@ -150,8 +165,26 @@ export function SettingsView() {
     }
   }
 
-  // Check if there are unsaved changes
   const hasChanges = Object.keys(editedValues).length > 0;
+
+  // Category title map
+  const categoryTitles: Record<string, string> = {
+    base: '基础设置',
+    ai_model: 'AI 模型配置',
+    data_source: '数据源',
+    notification: '通知渠道',
+    analysis: '分析配置',
+    system: '系统',
+  };
+
+  const categoryDescriptions: Record<string, string> = {
+    base: '管理自选股列表和报告语言等基础配置',
+    ai_model: '配置 AI 供应商、选择模型、设置 API 密钥和温度参数',
+    data_source: '配置实时行情数据源',
+    notification: '管理推送通知渠道',
+    analysis: '调整分析参数和阈值',
+    system: '系统性能和定时任务配置',
+  };
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
@@ -160,22 +193,23 @@ export function SettingsView() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">系统设置</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage system configuration and preferences
+            配置 AI 模型供应商、分析参数和系统偏好
           </p>
         </div>
         <div className="flex items-center gap-2">
           {saveSuccess && (
             <div className="flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400">
               <CheckCircle2 className="size-4" />
-              <span>Saved</span>
+              <span>保存成功</span>
             </div>
           )}
-          {Object.keys(validationIssues).length > 0 && Object.values(validationIssues).some(i => i.length > 0) && (
-            <div className="flex items-center gap-1.5 text-sm text-destructive">
-              <AlertCircle className="size-4" />
-              <span>Has issues</span>
-            </div>
-          )}
+          {Object.keys(validationIssues).length > 0 &&
+            Object.values(validationIssues).some((i) => i.length > 0) && (
+              <div className="flex items-center gap-1.5 text-sm text-destructive">
+                <AlertCircle className="size-4" />
+                <span>存在配置问题</span>
+              </div>
+            )}
           <Button
             variant="outline"
             size="sm"
@@ -184,7 +218,7 @@ export function SettingsView() {
             className="h-9 gap-1.5"
           >
             <RotateCcw className="size-3.5" />
-            Reset
+            重置
           </Button>
           <Button
             size="sm"
@@ -197,7 +231,7 @@ export function SettingsView() {
             ) : (
               <Save className="size-3.5" />
             )}
-            {saving ? 'Saving...' : 'Save'}
+            {saving ? '保存中...' : '保存'}
           </Button>
         </div>
       </div>
@@ -221,14 +255,12 @@ export function SettingsView() {
         <div className="lg:col-span-9">
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold">
-                {activeCategory === 'base' && '基础设置'}
-                {activeCategory === 'ai_model' && 'AI 模型'}
-                {activeCategory === 'data_source' && '数据源'}
-                {activeCategory === 'notification' && '通知渠道'}
-                {activeCategory === 'analysis' && '分析配置'}
-                {activeCategory === 'system' && '系统'}
+              <CardTitle className="text-base font-semibold">
+                {categoryTitles[activeCategory] || activeCategory}
               </CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {categoryDescriptions[activeCategory] || ''}
+              </p>
             </CardHeader>
             <CardContent className="pt-0">
               {loading ? (
@@ -243,7 +275,7 @@ export function SettingsView() {
                 </div>
               ) : categorySettings.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">
-                  No settings in this category.
+                  该分类暂无配置项
                 </p>
               ) : (
                 <div className="divide-y">
@@ -254,6 +286,7 @@ export function SettingsView() {
                       value={getValue(config)}
                       onChange={handleChange}
                       issues={validationIssues[config.key]}
+                      allValues={getAllValues()}
                     />
                   ))}
                 </div>

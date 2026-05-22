@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { buildStockContext } from '@/lib/stock-data-context';
 import { chat } from '@/lib/llm';
-import { getConfigValue } from '@/lib/config-helpers';
+import { getLLMProvider, getLLMModel, getLLMTemperature, getProviderApiKey } from '@/lib/config-helpers';
 
 const STRATEGY_PROMPTS: Record<string, string> = {
   '均线金叉': '请重点分析均线系统，包括MA5、MA10、MA20、MA60的金叉死叉关系，判断短期和中期趋势。结合均线多头排列/空头排列给出买卖建议。',
@@ -103,8 +103,10 @@ export async function POST(request: NextRequest) {
 
     // Step 6: Call LLM
     const systemPrompt = buildSystemPrompt(skill);
-    const selectedModel = await getConfigValue('LITELLM_MODEL', 'deepseek-v4-flash');
-    const temperature = parseFloat(await getConfigValue('LLM_TEMPERATURE', '0.7')) || 0.7;
+    const providerId = await getLLMProvider('sensenova');
+    const selectedModel = await getLLMModel();
+    const temperature = await getLLMTemperature(0.7);
+    const apiKey = await getProviderApiKey(providerId);
 
     const startTime = Date.now();
 
@@ -113,7 +115,7 @@ export async function POST(request: NextRequest) {
         { role: 'system', content: systemPrompt },
         ...conversationMessages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
       ],
-      { model: selectedModel, temperature },
+      { model: selectedModel, temperature, providerId, apiKey: apiKey || undefined },
     );
 
     const duration = Date.now() - startTime;

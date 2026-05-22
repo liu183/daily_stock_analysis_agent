@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { chat } from '@/lib/llm';
-import { getConfigValue } from '@/lib/config-helpers';
+import { getLLMProvider, getLLMModel, getLLMTemperature, getProviderApiKey } from '@/lib/config-helpers';
 import type { AnalysisReport, ReportJson } from '@/types/stock';
 
 const FINANCE_BASE = 'https://internal-api.z.ai/external/finance';
@@ -173,9 +173,14 @@ export async function POST(request: NextRequest) {
     );
 
     // Step 3: Use LLM to generate analysis
-    const selectedModel = await getConfigValue('LITELLM_MODEL', 'deepseek-v4-flash');
-    const temperature = parseFloat(await getConfigValue('LLM_TEMPERATURE', '0.7')) || 0.7;
-    const rawContent = await chat([{ role: 'user', content: prompt }], { model: selectedModel, temperature });
+    const providerId = await getLLMProvider('sensenova');
+    const selectedModel = await getLLMModel();
+    const temperature = await getLLMTemperature(0.7);
+    const apiKey = await getProviderApiKey(providerId);
+    const rawContent = await chat(
+      [{ role: 'user', content: prompt }],
+      { model: selectedModel, temperature, providerId, apiKey: apiKey || undefined }
+    );
     if (!rawContent) {
       throw new Error('LLM returned empty response');
     }
