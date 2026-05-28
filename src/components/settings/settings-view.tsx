@@ -1,13 +1,29 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { Save, RotateCcw, Loader2, CheckCircle2, AlertCircle, Zap } from 'lucide-react';
+import { Save, RotateCcw, Loader2, CheckCircle2, AlertCircle, Zap, RefreshCw, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SettingsField } from './settings-field';
 import { SettingsCategoryNav } from './settings-category-nav';
 import type { SystemConfigItem, ConfigCategory } from '@/types/settings';
 import { DEFAULT_CONFIG } from '@/lib/default-config';
+import { getProvider } from '@/lib/llm';
+
+/** Build a fallback SystemConfigItem from DEFAULT_CONFIG when API is unavailable */
+function buildFallbackSettings(): SystemConfigItem[] {
+  return Object.values(DEFAULT_CONFIG).map((def) => ({
+    id: `fallback-${def.key}`,
+    key: def.key,
+    value: def.default,
+    category: def.category,
+    updatedAt: new Date().toISOString(),
+    label: def.label,
+    description: def.description,
+    type: def.type,
+    options: def.options,
+  }));
+}
 
 export function SettingsView() {
   const [activeCategory, setActiveCategory] = useState<ConfigCategory>('ai_model');
@@ -17,9 +33,13 @@ export function SettingsView() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [isOffline, setIsOffline] = useState(false);
 
   const fetchSettings = useCallback(async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       const res = await fetch('/api/settings');
       if (res.ok) {
@@ -32,9 +52,20 @@ export function SettingsView() {
           }
         }
         setSettings(all);
+        setIsOffline(false);
+      } else {
+        // API returned error - use fallback
+        const errText = await res.text().catch(() => 'Unknown error');
+        console.error('Settings API error:', res.status, errText);
+        setFetchError(`服务器返回 ${res.status} 错误`);
+        setSettings(buildFallbackSettings());
+        setIsOffline(true);
       }
     } catch (err) {
       console.error('Failed to fetch settings:', err);
+      setFetchError('无法连接到服务器，使用默认配置（仅可预览，无法保存）');
+      setSettings(buildFallbackSettings());
+      setIsOffline(true);
     } finally {
       setLoading(false);
     }
@@ -50,8 +81,7 @@ export function SettingsView() {
 
       // When provider changes, auto-select the first model of the new provider
       if (key === 'LLM_PROVIDER') {
-        const { LLM_PROVIDERS } = require('@/lib/llm');
-        const provider = LLM_PROVIDERS.find((p: { id: string }) => p.id === value);
+        const provider = getProvider(value);
         if (provider && provider.models.length > 0) {
           next['LITELLM_MODEL'] = provider.models[0].id;
         }
@@ -66,11 +96,18 @@ export function SettingsView() {
       return next;
     });
     setSaveSuccess(false);
+    setSaveError(null);
   }, []);
 
   const handleSave = useCallback(async () => {
+    if (isOffline) {
+      setSaveError('数据库未连接，无法保存配置。请检查服务器配置后刷新页面。');
+      return;
+    }
+
     setSaving(true);
     setSaveSuccess(false);
+    setSaveError(null);
     try {
       const editedKeys = Object.keys(editedValues);
       const newIssues: Record<string, string[]> = {};
@@ -118,18 +155,23 @@ export function SettingsView() {
         setEditedValues({});
         await fetchSettings();
         setTimeout(() => setSaveSuccess(false), 3000);
+      } else {
+        const errData = await res.json().catch(() => null);
+        setSaveError(errData?.error || `保存失败 (${res.status})`);
       }
     } catch (err) {
       console.error('Failed to save settings:', err);
+      setSaveError('网络错误，保存失败');
     } finally {
       setSaving(false);
     }
-  }, [editedValues, fetchSettings]);
+  }, [editedValues, fetchSettings, isOffline]);
 
   const handleReset = useCallback(() => {
     setEditedValues({});
     setValidationIssues({});
     setSaveSuccess(false);
+    setSaveError(null);
   }, []);
 
   // Get current value for a config item (edited value > db value > default)
@@ -188,6 +230,30 @@ export function SettingsView() {
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
+      {/* Offline warning banner */}
+      {isOffline && (
+        <div className="flex items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/40 px-4 py-3">
+          <Database className="size-5 text-amber-600 dark:text-amber-400 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+              数据库未连接
+            </p>
+            <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+              {fetchError || '当前使用默认配置，修改无法保存。请检查服务器 DATABASE_URL 配置。'}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchSettings}
+            className="shrink-0 h-8 gap-1.5 text-xs border-amber-400 dark:border-amber-600"
+          >
+            <RefreshCw className="size-3" />
+            重试连接
+          </Button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -196,11 +262,17 @@ export function SettingsView() {
             配置 AI 模型供应商、分析参数和系统偏好
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           {saveSuccess && (
             <div className="flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400">
               <CheckCircle2 className="size-4" />
               <span>保存成功</span>
+            </div>
+          )}
+          {saveError && (
+            <div className="flex items-center gap-1.5 text-sm text-destructive">
+              <AlertCircle className="size-4" />
+              <span>{saveError}</span>
             </div>
           )}
           {Object.keys(validationIssues).length > 0 &&
@@ -223,7 +295,7 @@ export function SettingsView() {
           <Button
             size="sm"
             onClick={handleSave}
-            disabled={saving || !hasChanges}
+            disabled={saving || !hasChanges || isOffline}
             className="h-9 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
           >
             {saving ? (

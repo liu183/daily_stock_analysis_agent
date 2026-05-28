@@ -64,10 +64,31 @@ export async function GET() {
     return NextResponse.json(grouped);
   } catch (error) {
     console.error('Failed to fetch settings:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch settings' },
-      { status: 500 }
-    );
+    const errorMsg = error instanceof Error ? error.message : String(error);
+
+    // If DB is down, return default config with a warning header
+    const fallback: Record<string, SystemConfigItem[]> = {};
+    for (const [key, def] of Object.entries(DEFAULT_CONFIG)) {
+      if (!fallback[def.category]) {
+        fallback[def.category] = [];
+      }
+      fallback[def.category].push({
+        id: `default-${key}`,
+        key: def.key,
+        value: def.default,
+        category: def.category,
+        updatedAt: new Date().toISOString(),
+        label: def.label,
+        description: def.description,
+        type: def.type,
+        options: def.options,
+      });
+    }
+
+    const response = NextResponse.json(fallback);
+    response.headers.set('X-Settings-Mode', 'fallback');
+    response.headers.set('X-Settings-Error', errorMsg);
+    return response;
   }
 }
 
@@ -105,8 +126,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ updated });
   } catch (error) {
     console.error('Failed to save settings:', error);
+    const errorMsg = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
-      { error: 'Failed to save settings' },
+      { error: `保存失败: ${errorMsg}` },
       { status: 500 }
     );
   }
