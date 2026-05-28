@@ -79,6 +79,14 @@ export const DEFAULT_CONFIG: Record<string, ConfigDef> = {
     default: '',
     category: 'ai_model',
   },
+  XIAOMI_API_KEY: {
+    key: 'XIAOMI_API_KEY',
+    label: '小米 API Key',
+    description: '小米代理平台 API 密钥（token-plan-ams.xiaomimimo.com），支持 GPT / Claude / DeepSeek',
+    type: 'password',
+    default: '',
+    category: 'ai_model',
+  },
 
   // ─── Data source ─────────────────────────────────────
   ENABLE_REALTIME_QUOTE: {

@@ -1,7 +1,7 @@
 /**
  * Multi-provider LLM Client
- * Supports SenseNova, OpenAI, and DeepSeek providers
- * Uses the OpenAI SDK (all three providers are OpenAI-compatible)
+ * Supports SenseNova, OpenAI, DeepSeek, and Xiaomi providers
+ * Uses the OpenAI SDK (all providers are OpenAI-compatible)
  */
 
 import OpenAI from 'openai';
@@ -105,6 +105,57 @@ export const LLM_PROVIDERS: LLMProviderDef[] = [
         description: '深度推理模型，复杂分析首选',
         contextWindow: '64K',
         features: ['深度推理', '链式思考', '复杂分析'],
+      },
+    ],
+  },
+  {
+    id: 'xiaomi',
+    name: '小米 Xiaomi',
+    baseURL: 'https://token-plan-ams.xiaomimimo.com/v1',
+    envKey: 'XIAOMI_API_KEY',
+    configKey: 'XIAOMI_API_KEY',
+    models: [
+      {
+        id: 'gpt-4o',
+        name: 'GPT-4o',
+        description: 'OpenAI 旗舰多模态模型（通过小米代理）',
+        contextWindow: '128K',
+        features: ['多模态', '函数调用', 'JSON模式'],
+      },
+      {
+        id: 'gpt-4o-mini',
+        name: 'GPT-4o Mini',
+        description: '高性价比快速模型（通过小米代理）',
+        contextWindow: '128K',
+        features: ['快速响应', '低成本', '结构化输出'],
+      },
+      {
+        id: 'deepseek-chat',
+        name: 'DeepSeek V3',
+        description: 'DeepSeek 通用对话模型（通过小米代理）',
+        contextWindow: '64K',
+        features: ['通用对话', '代码生成', '知识问答'],
+      },
+      {
+        id: 'deepseek-reasoner',
+        name: 'DeepSeek R1',
+        description: '深度推理模型（通过小米代理）',
+        contextWindow: '64K',
+        features: ['深度推理', '链式思考', '复杂分析'],
+      },
+      {
+        id: 'claude-sonnet-4-20250514',
+        name: 'Claude Sonnet 4',
+        description: 'Anthropic 旗舰模型（通过小米代理）',
+        contextWindow: '200K',
+        features: ['多模态', '深度推理', '长文本'],
+      },
+      {
+        id: 'claude-3-5-haiku-20241022',
+        name: 'Claude 3.5 Haiku',
+        description: 'Anthropic 快速模型（通过小米代理）',
+        contextWindow: '200K',
+        features: ['快速响应', '低成本', '高智能'],
       },
     ],
   },
